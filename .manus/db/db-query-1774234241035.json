@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE `posts` ADD `hookStrength` varchar(32);\nALTER TABLE `posts` ADD `hookAnalysis` text;\nALTER TABLE `posts` ADD `transcript` text;\nALTER TABLE `posts` ADD `keyMessages` json;\nALTER TABLE `posts` ADD `targetAudience` text;\nALTER TABLE `posts` ADD `emotionalTone` varchar(128);\nALTER TABLE `posts` ADD `hookScore` int;\nALTER TABLE `posts` ADD `structureScore` int;\nALTER TABLE `posts` ADD `ctaScore` int;\nALTER TABLE `posts` ADD `visualScore` int;\nALTER TABLE `posts` ADD `overallQualityScore` int;\nALTER TABLE `posts` ADD `ctaPresence` int;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4KWVS18y6Crq4Ex.root --database mvBso7YM2iGgmfuukYfWPK --execute ALTER TABLE `posts` ADD `hookStrength` varchar(32);\nALTER TABLE `posts` ADD `hookAnalysis` text;\nALTER TABLE `posts` ADD `transcript` text;\nALTER TABLE `posts` ADD `keyMessages` json;\nALTER TABLE `posts` ADD `targetAudience` text;\nALTER TABLE `posts` ADD `emotionalTone` varchar(128);\nALTER TABLE `posts` ADD `hookScore` int;\nALTER TABLE `posts` ADD `structureScore` int;\nALTER TABLE `posts` ADD `ctaScore` int;\nALTER TABLE `posts` ADD `visualScore` int;\nALTER TABLE `posts` ADD `overallQualityScore` int;\nALTER TABLE `posts` ADD `ctaPresence` int;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 16868
+}

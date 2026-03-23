@@ -1,0 +1,35 @@
+{
+  "query": "SELECT id, title, format FROM posts ORDER BY id DESC LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4KWVS18y6Crq4Ex.root --database mvBso7YM2iGgmfuukYfWPK --execute SELECT id, title, format FROM posts ORDER BY id DESC LIMIT 5;",
+  "rows": [
+    {
+      "id": "30001",
+      "title": "Unveiling the Hidden Gems of Lisbon's Alfama District",
+      "format": "reel"
+    },
+    {
+      "id": "10",
+      "title": "The one-pan dinner that went viral (2M views recipe)",
+      "format": "reel"
+    },
+    {
+      "id": "9",
+      "title": "Why your protein shake is making you fat",
+      "format": "reel"
+    },
+    {
+      "id": "8",
+      "title": "Stop saying \"I help people\" — say this instead",
+      "format": "reel"
+    },
+    {
+      "id": "7",
+      "title": "The 50/30/20 rule is dead — here's what replaced it",
+      "format": "carousel"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttitle\tformat\n30001\tUnveiling the Hidden Gems of Lisbon's Alfama District\treel\n10\tThe one-pan dinner that went viral (2M views recipe)\treel\n9\tWhy your protein shake is making you fat\treel\n8\tStop saying \"I help people\" — say this instead\treel\n7\tThe 50/30/20 rule is dead — here's what replaced it\tcarousel\n",
+  "stderr": "",
+  "execution_time_ms": 1618
+}

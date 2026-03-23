@@ -1,0 +1,44 @@
+# Impact Studio TODO
+
+- [x] Database schema: posts, creators, blueprints, user_profiles tables
+- [x] Run database migrations
+- [x] Seed mock data: 8+ posts, 6+ creators, 8+ blueprints, 1 user profile
+- [x] Server DB helpers for all tables
+- [x] tRPC routers: posts (list, filter, sort, detail), creators (list, detail), blueprints (list, detail, use), user profile, add content, AI coach
+- [x] Impact Score algorithm implementation
+- [x] AI Coach diagnostics via LLM
+- [x] Dark theme and branding setup (index.css, fonts)
+- [x] Dashboard layout with sidebar navigation
+- [x] Discover Content Library page (browse, filter, sort)
+- [x] Post Detail / Blueprint deep-dive page
+- [x] Discover Creator Profiles page (browse, filter)
+- [x] Creator Detail page (indexed content + summary)
+- [x] My Profile page (metrics, comparison, AI Coach)
+- [x] Blueprints Library page (browse by format/score)
+- [x] Blueprint Detail page (use blueprint / generate brief)
+- [x] Add Content page (paste URL, ingest, analyze)
+- [x] Vitest tests for core routers
+- [x] Final polish and checkpoint
+- [x] Switch to light mode theme (white/light gray backgrounds)
+- [x] Update color palette: deep greens for scores, warm ambers for warnings, clean blacks for text
+- [x] Update typography: bold, tight spacing, confident contrast
+- [x] Update DashboardLayout for light theme
+- [x] Update ImpactScore component colors for light theme
+- [x] Update all pages for light theme compatibility
+- [x] Verify all pages render correctly in light mode
+- [x] Fix: Profile page crash — item.avg.toFixed is not a function (string from DB aggregation)
+- [x] Research Bright Data Instagram API endpoints and data format
+- [x] Set up Bright Data API key via secrets
+- [x] Implement server-side Bright Data service for Instagram data fetching
+- [x] Update Add Content flow to use real Instagram data from Bright Data
+- [x] Update creator profile ingestion with real data
+- [x] Write tests for Bright Data integration
+- [x] Fix: Add Content insert error — post insert fails when Bright Data returns data (varchar field truncation)
+- [x] Fix: Bright Data API returns 404 — switched to correct Scrapers API endpoint (/datasets/v3/scrape with dataset_id)
+- [x] Set up Gemini Flash 2.5 API key via secrets
+- [x] Research Gemini Flash 2.5 API for image/video/text multimodal analysis
+- [x] Build server-side Gemini service for content analysis (image, video, caption)
+- [x] Update Add Content flow to send post media to Gemini for deep analysis
+- [x] Update blueprint generation to use Gemini visual/video insights
+- [x] Update frontend to display richer analysis results (visual style, hook analysis, etc.)
+- [x] Write tests for Gemini integration

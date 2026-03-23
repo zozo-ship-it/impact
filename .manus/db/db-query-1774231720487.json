@@ -1,0 +1,30 @@
+{
+  "query": "SELECT id, handle FROM creators ORDER BY id DESC LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4KWVS18y6Crq4Ex.root --database mvBso7YM2iGgmfuukYfWPK --execute SELECT id, handle FROM creators ORDER BY id DESC LIMIT 5;",
+  "rows": [
+    {
+      "id": "60001",
+      "handle": "@global_wanderer"
+    },
+    {
+      "id": "30001",
+      "handle": "@globalexplorer"
+    },
+    {
+      "id": "8",
+      "handle": "@coachdaniel"
+    },
+    {
+      "id": "7",
+      "handle": "@moneywithlisa"
+    },
+    {
+      "id": "6",
+      "handle": "@designbyjake"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\thandle\n60001\t@global_wanderer\n30001\t@globalexplorer\n8\t@coachdaniel\n7\t@moneywithlisa\n6\t@designbyjake\n",
+  "stderr": "",
+  "execution_time_ms": 1598
+}

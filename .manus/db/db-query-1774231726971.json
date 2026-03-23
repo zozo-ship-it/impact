@@ -1,0 +1,13 @@
+{
+  "query": "SELECT AUTO_INCREMENT FROM information_schema.TABLES WHERE TABLE_NAME = 'posts';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4KWVS18y6Crq4Ex.root --database mvBso7YM2iGgmfuukYfWPK --execute SELECT AUTO_INCREMENT FROM information_schema.TABLES WHERE TABLE_NAME = 'posts';",
+  "rows": [
+    {
+      "AUTO_INCREMENT": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "AUTO_INCREMENT\n0\n",
+  "stderr": "",
+  "execution_time_ms": 1514
+}
