@@ -1,5 +1,7 @@
 import { eq, desc, asc, like, and, sql } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle } from "drizzle-orm/better-sqlite3";
+import Database from "better-sqlite3";
+import path from "node:path";
 import { InsertUser, users, creators, posts, blueprints, userProfiles } from "../drizzle/schema";
 import type { Creator, Post, Blueprint, UserProfile } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -7,9 +9,12 @@ import { ENV } from './_core/env';
 let _db: ReturnType<typeof drizzle> | null = null;
 
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
+  if (!_db) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      const dbPath = process.env.DATABASE_URL || path.join(process.cwd(), 'data.db');
+      const sqlite = new Database(dbPath);
+      sqlite.pragma('journal_mode = WAL');
+      _db = drizzle(sqlite);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -52,12 +57,15 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.role = 'admin';
     }
     if (!values.lastSignedIn) {
-      values.lastSignedIn = new Date();
+      values.lastSignedIn = new Date().toISOString();
     }
     if (Object.keys(updateSet).length === 0) {
-      updateSet.lastSignedIn = new Date();
+      updateSet.lastSignedIn = new Date().toISOString();
     }
-    await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
+    await db.insert(users).values(values).onConflictDoUpdate({
+      target: users.openId,
+      set: updateSet,
+    });
   } catch (error) {
     console.error("[Database] Failed to upsert user:", error);
     throw error;
@@ -122,8 +130,8 @@ export async function getPostsByCreatorId(creatorId: number) {
 export async function insertPost(data: any) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(posts).values(data);
-  return result[0].insertId;
+  const result = db.insert(posts).values(data).returning({ id: posts.id }).get();
+  return result.id;
 }
 
 // ─── Creators ─────────────────────────────────────────────────
@@ -176,8 +184,8 @@ export async function getCreatorByHandle(handle: string) {
 export async function insertCreator(data: any) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(creators).values(data);
-  return result[0].insertId;
+  const result = db.insert(creators).values(data).returning({ id: creators.id }).get();
+  return result.id;
 }
 
 export async function updateCreator(id: number, data: Partial<Creator>) {
@@ -223,8 +231,8 @@ export async function getBlueprintById(id: number) {
 export async function insertBlueprint(data: any) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(blueprints).values(data);
-  return result[0].insertId;
+  const result = db.insert(blueprints).values(data).returning({ id: blueprints.id }).get();
+  return result.id;
 }
 
 export async function incrementBlueprintUsage(id: number) {
@@ -250,8 +258,8 @@ export async function upsertUserProfile(userId: number, data: Partial<UserProfil
     await db.update(userProfiles).set(data).where(eq(userProfiles.userId, userId));
     return existing.id;
   } else {
-    const result = await db.insert(userProfiles).values({ userId, instagramHandle: data.instagramHandle || '', ...data });
-    return result[0].insertId;
+    const result = db.insert(userProfiles).values({ userId, instagramHandle: data.instagramHandle || '', ...data }).returning({ id: userProfiles.id }).get();
+    return result.id;
   }
 }
 
