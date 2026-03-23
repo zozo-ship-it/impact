@@ -128,3 +128,70 @@ export const userProfiles = mysqlTable("userProfiles", {
 
 export type UserProfile = typeof userProfiles.$inferSelect;
 export type InsertUserProfile = typeof userProfiles.$inferInsert;
+
+// Email campaigns table (synced from MailerLite + AI analysis)
+export const emailCampaigns = mysqlTable("emailCampaigns", {
+  id: int("id").autoincrement().primaryKey(),
+  mailerliteId: varchar("mailerliteId", { length: 64 }).notNull().unique(),
+  userId: int("userId").notNull(),
+  name: varchar("name", { length: 512 }).notNull(),
+  subject: varchar("subject", { length: 512 }),
+  fromEmail: varchar("fromEmail", { length: 320 }),
+  fromName: varchar("fromName", { length: 256 }),
+  previewText: text("previewText"),
+  status: mysqlEnum("status", ["draft", "ready", "sent", "sending"]).notNull().default("draft"),
+  type: varchar("type", { length: 32 }).default("regular"),
+  // Stats
+  sent: int("sent").default(0),
+  opensCount: int("opensCount").default(0),
+  uniqueOpens: int("uniqueOpens").default(0),
+  openRate: float("openRate").default(0),
+  clicksCount: int("clicksCount").default(0),
+  uniqueClicks: int("uniqueClicks").default(0),
+  clickRate: float("clickRate").default(0),
+  unsubscribes: int("unsubscribes").default(0),
+  unsubscribeRate: float("unsubscribeRate").default(0),
+  spamCount: int("spamCount").default(0),
+  bouncesHard: int("bouncesHard").default(0),
+  bouncesSoft: int("bouncesSoft").default(0),
+  clickToOpenRate: float("clickToOpenRate").default(0),
+  // AI Analysis
+  subjectLineScore: int("subjectLineScore"),
+  subjectLineAnalysis: text("subjectLineAnalysis"),
+  contentScore: int("contentScore"),
+  contentAnalysis: text("contentAnalysis"),
+  ctaScore: int("ctaScore"),
+  ctaAnalysis: text("ctaAnalysis"),
+  overallScore: int("overallScore"),
+  recommendations: json("recommendations"),
+  targetAudience: text("targetAudience"),
+  emotionalTone: varchar("emotionalTone", { length: 128 }),
+  // Timestamps
+  scheduledFor: timestamp("scheduledFor"),
+  sentAt: timestamp("sentAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type EmailCampaign = typeof emailCampaigns.$inferSelect;
+export type InsertEmailCampaign = typeof emailCampaigns.$inferInsert;
+
+// Email templates (AI-generated drafts)
+export const emailTemplates = mysqlTable("emailTemplates", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  name: varchar("name", { length: 256 }).notNull(),
+  subject: varchar("subject", { length: 512 }).notNull(),
+  previewText: varchar("previewText", { length: 512 }),
+  htmlContent: text("htmlContent").notNull(),
+  textContent: text("textContent"),
+  tone: varchar("tone", { length: 64 }),
+  goal: varchar("goal", { length: 128 }),
+  audience: varchar("audience", { length: 256 }),
+  sourceMailerliteCampaignId: varchar("sourceMailerliteCampaignId", { length: 64 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type EmailTemplate = typeof emailTemplates.$inferSelect;
+export type InsertEmailTemplate = typeof emailTemplates.$inferInsert;

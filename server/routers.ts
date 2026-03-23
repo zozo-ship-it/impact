@@ -7,6 +7,7 @@ import { invokeLLM } from "./_core/llm";
 import * as db from "./db";
 import { collectPost, collectProfile, mapBrightDataPostToInternal, mapBrightDataProfileToInternal } from "./brightdata";
 import { analyzeContent as geminiAnalyze, type ContentAnalysis } from "./gemini";
+import * as mailerlite from "./mailerlite";
 
 export const appRouter = router({
   system: systemRouter,
@@ -741,6 +742,391 @@ Return JSON with:
             ctaPresence: geminiAnalysis?.ctaPresence ?? null,
           },
         };
+      }),
+  }),
+
+  // ─── Email Marketing ────────────────────────────────────────────
+  email: router({
+    /** Check if MailerLite is connected */
+    status: protectedProcedure.query(async () => {
+      return { connected: mailerlite.isConfigured() };
+    }),
+
+    /** Sync campaigns from MailerLite into the database */
+    sync: protectedProcedure.mutation(async ({ ctx }) => {
+      if (!mailerlite.isConfigured()) {
+        throw new Error("MailerLite API key not configured. Set MAILERLITE_API_KEY environment variable.");
+      }
+
+      const { data: campaigns } = await mailerlite.listCampaigns({ status: "sent", limit: 50 });
+      let synced = 0;
+
+      for (const c of campaigns) {
+        const email = c.emails?.[0];
+        await db.upsertEmailCampaign({
+          mailerliteId: c.id,
+          userId: ctx.user.id,
+          name: c.name,
+          subject: email?.subject || c.name,
+          fromEmail: email?.from || "",
+          fromName: email?.from_name || "",
+          previewText: email?.preview_text || "",
+          status: c.status,
+          type: c.type,
+          sent: c.stats?.sent || 0,
+          opensCount: c.stats?.opens_count || 0,
+          uniqueOpens: c.stats?.unique_opens_count || 0,
+          openRate: c.stats?.open_rate?.float || 0,
+          clicksCount: c.stats?.clicks_count || 0,
+          uniqueClicks: c.stats?.unique_clicks_count || 0,
+          clickRate: c.stats?.click_rate?.float || 0,
+          unsubscribes: c.stats?.unsubscribes_count || 0,
+          unsubscribeRate: c.stats?.unsubscribe_rate?.float || 0,
+          spamCount: c.stats?.spam_count || 0,
+          bouncesHard: c.stats?.hard_bounces_count || 0,
+          bouncesSoft: c.stats?.soft_bounces_count || 0,
+          clickToOpenRate: c.stats?.click_to_open_rate?.float || 0,
+          sentAt: c.finished_at ? new Date(c.finished_at) : null,
+        });
+        synced++;
+      }
+
+      // Also sync drafts
+      const { data: drafts } = await mailerlite.listCampaigns({ status: "draft", limit: 20 });
+      for (const c of drafts) {
+        const email = c.emails?.[0];
+        await db.upsertEmailCampaign({
+          mailerliteId: c.id,
+          userId: ctx.user.id,
+          name: c.name,
+          subject: email?.subject || c.name,
+          fromEmail: email?.from || "",
+          fromName: email?.from_name || "",
+          previewText: email?.preview_text || "",
+          status: c.status,
+          type: c.type,
+        });
+        synced++;
+      }
+
+      return { synced };
+    }),
+
+    /** List synced campaigns */
+    campaigns: protectedProcedure
+      .input(z.object({
+        status: z.string().optional(),
+        sortBy: z.string().optional(),
+        sortOrder: z.enum(['asc', 'desc']).optional(),
+        search: z.string().optional(),
+        limit: z.number().min(1).max(100).optional(),
+        offset: z.number().min(0).optional(),
+      }).optional())
+      .query(async ({ ctx, input }) => {
+        return db.listEmailCampaigns(ctx.user.id, input || {});
+      }),
+
+    /** Get a single campaign with details */
+    getById: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        return db.getEmailCampaignById(input.id);
+      }),
+
+    /** Get aggregate email marketing stats */
+    stats: protectedProcedure.query(async ({ ctx }) => {
+      return db.getEmailCampaignStats(ctx.user.id);
+    }),
+
+    /** AI-analyze a campaign's email content */
+    analyze: protectedProcedure
+      .input(z.object({ campaignId: z.number() }))
+      .mutation(async ({ input }) => {
+        const campaign = await db.getEmailCampaignById(input.campaignId);
+        if (!campaign) throw new Error("Campaign not found");
+
+        const prompt = `You are an expert email marketing analyst. Analyze this email campaign and provide detailed scoring and recommendations.
+
+Campaign: "${campaign.name}"
+Subject Line: "${campaign.subject}"
+Preview Text: "${campaign.previewText || 'None'}"
+From: ${campaign.fromName} <${campaign.fromEmail}>
+
+Performance Stats:
+- Sent to: ${campaign.sent} subscribers
+- Open Rate: ${campaign.openRate}%
+- Click Rate: ${campaign.clickRate}%
+- Click-to-Open Rate: ${campaign.clickToOpenRate}%
+- Unsubscribe Rate: ${campaign.unsubscribeRate}%
+- Spam Reports: ${campaign.spamCount}
+
+Analyze and return JSON with:
+{
+  "subjectLineScore": 0-100,
+  "subjectLineAnalysis": "detailed analysis of the subject line effectiveness",
+  "contentScore": 0-100,
+  "contentAnalysis": "analysis of the email content strategy",
+  "ctaScore": 0-100,
+  "ctaAnalysis": "analysis of the call-to-action effectiveness",
+  "overallScore": 0-100,
+  "targetAudience": "inferred target audience",
+  "emotionalTone": "the emotional tone of the email",
+  "recommendations": ["actionable recommendation 1", "actionable recommendation 2", "actionable recommendation 3", "actionable recommendation 4"]
+}`;
+
+        const response = await invokeLLM({
+          messages: [
+            { role: "system", content: "You are an expert email marketing analyst. Provide specific, data-driven analysis. Return valid JSON only." },
+            { role: "user", content: prompt },
+          ],
+          response_format: {
+            type: "json_schema",
+            json_schema: {
+              name: "email_analysis",
+              strict: true,
+              schema: {
+                type: "object",
+                properties: {
+                  subjectLineScore: { type: "integer" },
+                  subjectLineAnalysis: { type: "string" },
+                  contentScore: { type: "integer" },
+                  contentAnalysis: { type: "string" },
+                  ctaScore: { type: "integer" },
+                  ctaAnalysis: { type: "string" },
+                  overallScore: { type: "integer" },
+                  targetAudience: { type: "string" },
+                  emotionalTone: { type: "string" },
+                  recommendations: { type: "array", items: { type: "string" } },
+                },
+                required: ["subjectLineScore", "subjectLineAnalysis", "contentScore", "contentAnalysis", "ctaScore", "ctaAnalysis", "overallScore", "targetAudience", "emotionalTone", "recommendations"],
+                additionalProperties: false,
+              },
+            },
+          },
+        });
+
+        const rawContent = response.choices[0]?.message?.content;
+        const analysis = JSON.parse(typeof rawContent === 'string' ? rawContent : '{}');
+
+        await db.updateEmailCampaignAnalysis(input.campaignId, {
+          subjectLineScore: analysis.subjectLineScore,
+          subjectLineAnalysis: analysis.subjectLineAnalysis,
+          contentScore: analysis.contentScore,
+          contentAnalysis: analysis.contentAnalysis,
+          ctaScore: analysis.ctaScore,
+          ctaAnalysis: analysis.ctaAnalysis,
+          overallScore: analysis.overallScore,
+          targetAudience: analysis.targetAudience,
+          emotionalTone: analysis.emotionalTone,
+          recommendations: JSON.stringify(analysis.recommendations),
+        });
+
+        return analysis;
+      }),
+
+    /** AI-compose a new email */
+    compose: protectedProcedure
+      .input(z.object({
+        topic: z.string().min(1),
+        goal: z.enum(["newsletter", "promotion", "announcement", "welcome", "re-engagement", "product-launch"]),
+        tone: z.enum(["professional", "casual", "friendly", "urgent", "inspirational", "educational"]),
+        audience: z.string().optional(),
+        keyPoints: z.string().optional(),
+        referenceCampaignId: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        let referenceContext = "";
+        if (input.referenceCampaignId) {
+          const ref = await db.getEmailCampaignById(input.referenceCampaignId);
+          if (ref) {
+            referenceContext = `\n\nReference a high-performing campaign for style inspiration:
+- Subject: "${ref.subject}"
+- Open Rate: ${ref.openRate}%
+- Click Rate: ${ref.clickRate}%`;
+          }
+        }
+
+        // Get top performing campaigns for context
+        const { items: topCampaigns } = await db.listEmailCampaigns(ctx.user.id, {
+          sortBy: 'openRate',
+          sortOrder: 'desc',
+          limit: 3,
+          status: 'sent',
+        });
+
+        const topPerformersContext = topCampaigns.length > 0
+          ? `\n\nTop performing campaigns for reference:\n${topCampaigns.map(c => `- "${c.subject}" — ${c.openRate}% open, ${c.clickRate}% click`).join('\n')}`
+          : "";
+
+        const prompt = `You are an expert email copywriter. Create a complete marketing email based on these requirements:
+
+Topic: ${input.topic}
+Goal: ${input.goal}
+Tone: ${input.tone}
+${input.audience ? `Target Audience: ${input.audience}` : ""}
+${input.keyPoints ? `Key Points to Cover: ${input.keyPoints}` : ""}
+${referenceContext}
+${topPerformersContext}
+
+Generate a complete email with:
+{
+  "subject": "compelling subject line (under 60 characters)",
+  "previewText": "preview text that complements the subject (under 90 characters)",
+  "htmlContent": "full HTML email content with inline styles, clean design, clear CTA button",
+  "textContent": "plain text version of the email"
+}
+
+For the HTML content:
+- Use a clean, modern email layout with inline CSS
+- Include a clear header, body sections, and footer
+- Add a prominent CTA button with inline styles
+- Use a max-width of 600px centered layout
+- Keep it mobile-friendly
+- Use a professional color scheme`;
+
+        const response = await invokeLLM({
+          messages: [
+            { role: "system", content: "You are an expert email copywriter who creates high-converting marketing emails. Return valid JSON only." },
+            { role: "user", content: prompt },
+          ],
+          response_format: {
+            type: "json_schema",
+            json_schema: {
+              name: "email_draft",
+              strict: true,
+              schema: {
+                type: "object",
+                properties: {
+                  subject: { type: "string" },
+                  previewText: { type: "string" },
+                  htmlContent: { type: "string" },
+                  textContent: { type: "string" },
+                },
+                required: ["subject", "previewText", "htmlContent", "textContent"],
+                additionalProperties: false,
+              },
+            },
+          },
+        });
+
+        const rawContent = response.choices[0]?.message?.content;
+        const draft = JSON.parse(typeof rawContent === 'string' ? rawContent : '{}');
+
+        // Save as template
+        const templateId = await db.insertEmailTemplate({
+          userId: ctx.user.id,
+          name: `${input.goal}: ${input.topic}`,
+          subject: draft.subject,
+          previewText: draft.previewText,
+          htmlContent: draft.htmlContent,
+          textContent: draft.textContent,
+          tone: input.tone,
+          goal: input.goal,
+          audience: input.audience || null,
+          sourceMailerliteCampaignId: input.referenceCampaignId
+            ? String(input.referenceCampaignId)
+            : null,
+        });
+
+        return { ...draft, templateId };
+      }),
+
+    /** Push a template to MailerLite as a draft campaign */
+    pushToMailerlite: protectedProcedure
+      .input(z.object({
+        templateId: z.number(),
+        fromEmail: z.string().email(),
+        fromName: z.string().min(1),
+      }))
+      .mutation(async ({ input }) => {
+        if (!mailerlite.isConfigured()) {
+          throw new Error("MailerLite API key not configured");
+        }
+
+        const template = await db.getEmailTemplateById(input.templateId);
+        if (!template) throw new Error("Template not found");
+
+        const result = await mailerlite.createCampaignDraft({
+          name: template.name,
+          subject: template.subject,
+          from: input.fromEmail,
+          fromName: input.fromName,
+          previewText: template.previewText || "",
+          content: template.htmlContent,
+        });
+
+        return { campaignId: result.data.id, name: result.data.name };
+      }),
+
+    /** List saved email templates */
+    templates: protectedProcedure
+      .input(z.object({
+        limit: z.number().min(1).max(100).optional(),
+        offset: z.number().min(0).optional(),
+      }).optional())
+      .query(async ({ ctx, input }) => {
+        return db.listEmailTemplates(ctx.user.id, input);
+      }),
+
+    /** Get a single template */
+    getTemplate: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        return db.getEmailTemplateById(input.id);
+      }),
+
+    /** Delete a template */
+    deleteTemplate: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.deleteEmailTemplate(input.id);
+        return { success: true };
+      }),
+
+    /** AI coach for email marketing */
+    coach: protectedProcedure
+      .input(z.object({
+        messages: z.array(z.object({
+          role: z.enum(["system", "user", "assistant"]),
+          content: z.string(),
+        })),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const stats = await db.getEmailCampaignStats(ctx.user.id);
+        const { items: recentCampaigns } = await db.listEmailCampaigns(ctx.user.id, {
+          sortBy: 'openRate',
+          sortOrder: 'desc',
+          limit: 5,
+          status: 'sent',
+        });
+
+        const systemPrompt = `You are an expert email marketing coach inside "Impact Studio". Help the user improve their email marketing performance.
+
+EMAIL MARKETING STATS:
+- Total Campaigns Sent: ${stats.totalCampaigns}
+- Total Emails Sent: ${stats.totalSent}
+- Average Open Rate: ${stats.avgOpenRate}%
+- Average Click Rate: ${stats.avgClickRate}%
+- Average Score: ${stats.avgScore}/100
+
+${recentCampaigns.length > 0 ? `TOP PERFORMING CAMPAIGNS:
+${recentCampaigns.map(c => `- "${c.subject}" — ${c.openRate}% open, ${c.clickRate}% click, Score: ${c.overallScore || 'N/A'}/100`).join('\n')}` : 'No campaign data available yet.'}
+
+Industry benchmarks for reference:
+- Average email open rate: 20-25%
+- Average click rate: 2-5%
+- Good unsubscribe rate: < 0.5%
+
+Provide specific, actionable advice. Reference actual numbers and comparisons. Be direct but encouraging. Use markdown formatting.`;
+
+        const messages = [
+          { role: "system" as const, content: systemPrompt },
+          ...input.messages.filter(m => m.role !== "system"),
+        ];
+
+        const response = await invokeLLM({ messages });
+        const responseContent = response.choices[0]?.message?.content;
+        return (typeof responseContent === 'string' ? responseContent : '') || "I'm having trouble generating a response right now.";
       }),
   }),
 

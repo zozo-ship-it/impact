@@ -1,7 +1,7 @@
 import { eq, desc, asc, like, and, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, creators, posts, blueprints, userProfiles } from "../drizzle/schema";
-import type { Creator, Post, Blueprint, UserProfile } from "../drizzle/schema";
+import { InsertUser, users, creators, posts, blueprints, userProfiles, emailCampaigns, emailTemplates } from "../drizzle/schema";
+import type { Creator, Post, Blueprint, UserProfile, EmailCampaign, EmailTemplate } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -285,4 +285,128 @@ export async function getLibraryStats() {
     blueprintCount: bc[0]?.count || 0,
     avgScore: avg[0]?.avg || 0,
   };
+}
+
+// ─── Email Campaigns ─────────────────────────────────────────
+
+export async function listEmailCampaigns(userId: number, opts: {
+  status?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  search?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  const db = await getDb();
+  if (!db) return { items: [], total: 0 };
+
+  const conditions = [eq(emailCampaigns.userId, userId)];
+  if (opts.status) conditions.push(eq(emailCampaigns.status, opts.status as any));
+  if (opts.search) conditions.push(like(emailCampaigns.name, `%${opts.search}%`));
+
+  const where = and(...conditions);
+
+  const sortCol = opts.sortBy === 'openRate' ? emailCampaigns.openRate
+    : opts.sortBy === 'clickRate' ? emailCampaigns.clickRate
+    : opts.sortBy === 'sent' ? emailCampaigns.sent
+    : opts.sortBy === 'score' ? emailCampaigns.overallScore
+    : emailCampaigns.createdAt;
+
+  const order = opts.sortOrder === 'asc' ? asc(sortCol) : desc(sortCol);
+
+  const [items, countResult] = await Promise.all([
+    db.select().from(emailCampaigns).where(where).orderBy(order).limit(opts.limit || 20).offset(opts.offset || 0),
+    db.select({ count: sql<number>`count(*)` }).from(emailCampaigns).where(where),
+  ]);
+
+  return { items, total: countResult[0]?.count || 0 };
+}
+
+export async function getEmailCampaignById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(emailCampaigns).where(eq(emailCampaigns.id, id)).limit(1);
+  return result[0];
+}
+
+export async function getEmailCampaignByMailerliteId(mlId: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(emailCampaigns).where(eq(emailCampaigns.mailerliteId, mlId)).limit(1);
+  return result[0];
+}
+
+export async function upsertEmailCampaign(data: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const existing = await getEmailCampaignByMailerliteId(data.mailerliteId);
+  if (existing) {
+    await db.update(emailCampaigns).set(data).where(eq(emailCampaigns.mailerliteId, data.mailerliteId));
+    return existing.id;
+  } else {
+    const result = await db.insert(emailCampaigns).values(data);
+    return result[0].insertId;
+  }
+}
+
+export async function updateEmailCampaignAnalysis(id: number, analysis: Partial<EmailCampaign>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(emailCampaigns).set(analysis).where(eq(emailCampaigns.id, id));
+}
+
+export async function getEmailCampaignStats(userId: number) {
+  const db = await getDb();
+  if (!db) return { totalCampaigns: 0, totalSent: 0, avgOpenRate: 0, avgClickRate: 0, avgScore: 0 };
+
+  const result = await db.select({
+    totalCampaigns: sql<number>`count(*)`,
+    totalSent: sql<number>`COALESCE(SUM(sent), 0)`,
+    avgOpenRate: sql<number>`COALESCE(ROUND(AVG(openRate), 2), 0)`,
+    avgClickRate: sql<number>`COALESCE(ROUND(AVG(clickRate), 2), 0)`,
+    avgScore: sql<number>`COALESCE(ROUND(AVG(overallScore)), 0)`,
+  }).from(emailCampaigns).where(
+    and(eq(emailCampaigns.userId, userId), eq(emailCampaigns.status, "sent"))
+  );
+
+  return result[0] || { totalCampaigns: 0, totalSent: 0, avgOpenRate: 0, avgClickRate: 0, avgScore: 0 };
+}
+
+// ─── Email Templates ─────────────────────────────────────────
+
+export async function listEmailTemplates(userId: number, opts?: { limit?: number; offset?: number }) {
+  const db = await getDb();
+  if (!db) return { items: [], total: 0 };
+
+  const [items, countResult] = await Promise.all([
+    db.select().from(emailTemplates)
+      .where(eq(emailTemplates.userId, userId))
+      .orderBy(desc(emailTemplates.createdAt))
+      .limit(opts?.limit || 20)
+      .offset(opts?.offset || 0),
+    db.select({ count: sql<number>`count(*)` }).from(emailTemplates).where(eq(emailTemplates.userId, userId)),
+  ]);
+
+  return { items, total: countResult[0]?.count || 0 };
+}
+
+export async function getEmailTemplateById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(emailTemplates).where(eq(emailTemplates.id, id)).limit(1);
+  return result[0];
+}
+
+export async function insertEmailTemplate(data: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(emailTemplates).values(data);
+  return result[0].insertId;
+}
+
+export async function deleteEmailTemplate(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(emailTemplates).where(eq(emailTemplates.id, id));
 }

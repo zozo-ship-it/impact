@@ -30,6 +30,7 @@ import {
   LogOut,
   PanelLeft,
   Zap,
+  Mail,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -42,6 +43,7 @@ const menuItems = [
   { icon: User, label: "My Profile", path: "/profile" },
   { icon: Layers, label: "Blueprints", path: "/blueprints" },
   { icon: PlusCircle, label: "Add Content", path: "/add" },
+  { icon: Mail, label: "Email Marketing", path: "/email" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";

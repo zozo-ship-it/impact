@@ -13,6 +13,9 @@ import BlueprintsPage from "./pages/Blueprints";
 import BlueprintDetailPage from "./pages/BlueprintDetail";
 import AddContentPage from "./pages/AddContent";
 import PostDetailPage from "./pages/PostDetail";
+import EmailMarketingPage from "./pages/EmailMarketing";
+import EmailCampaignDetailPage from "./pages/EmailCampaignDetail";
+import EmailComposerPage from "./pages/EmailComposer";
 
 function Router() {
   return (
@@ -26,6 +29,9 @@ function Router() {
         <Route path="/blueprints/:id" component={BlueprintDetailPage} />
         <Route path="/add" component={AddContentPage} />
         <Route path="/posts/:id" component={PostDetailPage} />
+        <Route path="/email" component={EmailMarketingPage} />
+        <Route path="/email/campaigns/:id" component={EmailCampaignDetailPage} />
+        <Route path="/email/compose" component={EmailComposerPage} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>
