@@ -1,0 +1,13 @@
+{
+  "name": "Impact Studio",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": {
+      "label": "Impact Studio",
+      "onAutoForward": "openBrowser"
+    }
+  },
+  "postCreateCommand": "npm install -g pnpm@10.4.1 && pnpm install && cd node_modules/better-sqlite3 && npm run build-release && cd ../.. && node seed-data.mjs",
+  "postStartCommand": "pnpm dev"
+}
