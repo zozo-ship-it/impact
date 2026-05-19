@@ -1,0 +1,1 @@
+ALTER TABLE `content_items` MODIFY COLUMN `tags` json;
